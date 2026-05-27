@@ -442,16 +442,21 @@
         // Target class
         class Target {
             constructor() {
-                const colors = [0xff0000, 0x00ff00, 0xffff00, 0xff00ff, 0x00ffff];
+                const colors = [0xff3d3d, 0x5cff7d, 0xffea3d, 0xed3dff, 0x3df0ff];
                 const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
-                this.geometry = new THREE.SphereGeometry(targetRadius, 32, 32);
-                this.material = new THREE.MeshStandardMaterial({
+                this.geometry = new THREE.SphereGeometry(targetRadius, 48, 48);
+                this.material = new THREE.MeshPhysicalMaterial({
                     color: randomColor,
-                    metalness: 0.3,
-                    roughness: 0.4,
+                    metalness: 0.1,
+                    roughness: 0.2,
+                    clearcoat: 0.85,
+                    clearcoatRoughness: 0.1,
+                    reflectivity: 0.8,
                     emissive: randomColor,
-                    emissiveIntensity: 0.5,
+                    emissiveIntensity: 0.18,
+                    transparent: true,
+                    opacity: 0.96,
                 });
                 this.mesh = new THREE.Mesh(this.geometry, this.material);
 
@@ -468,25 +473,48 @@
                 this.mesh.castShadow = true;
                 this.mesh.receiveShadow = true;
 
+                this.addGlow();
+                this.addHighlightRing();
+
                 scene.add(this.mesh);
 
                 // Lifetime
                 this.lifetime = 0;
                 this.maxLifetime = targetLife;
-
-                // Add glow effect
-                this.addGlow();
             }
 
             addGlow() {
-                const glowGeometry = new THREE.SphereGeometry(3.5, 32, 32);
+                const glowGeometry = new THREE.SphereGeometry(targetRadius * 1.4, 32, 32);
                 const glowMaterial = new THREE.MeshBasicMaterial({
                     color: this.material.color,
                     transparent: true,
-                    opacity: 0.2,
+                    opacity: 0.16,
+                    side: THREE.BackSide,
                 });
                 const glow = new THREE.Mesh(glowGeometry, glowMaterial);
                 this.mesh.add(glow);
+            }
+
+            addHighlightRing() {
+                const ringGeometry = new THREE.TorusGeometry(targetRadius * 0.78, targetRadius * 0.08, 12, 90);
+                const ringMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.28,
+                });
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring.rotation.x = Math.PI / 2;
+                ring.rotation.y = Math.PI / 4;
+                this.mesh.add(ring);
+
+                const edgeMaterial = new THREE.LineBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.18,
+                });
+                const edgeGeometry = new THREE.EdgesGeometry(this.geometry, 15);
+                const edgeLines = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+                this.mesh.add(edgeLines);
             }
 
             update(deltaTime) {
