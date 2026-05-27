@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Aim Trainer Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ff00;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            z-index: 100;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            border: 2px solid #00ff00;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 100;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        #crosshair::before {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 10px;
+            background-color: #00ff00;
+            left: 50%;
+            top: -10px;
+            transform: translateX(-50%);
+        }
+
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 10px;
+            background-color: #00ff00;
+            left: 50%;
+            bottom: -10px;
+            transform: translateX(-50%);
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            color: #00ff00;
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 200;
+            display: none;
+            border: 3px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        #gameOver h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        #gameOver p {
+            font-size: 32px;
+            margin: 10px 0;
+        }
+
+        #gameOver button {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 20px;
+            background-color: #00ff00;
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        #gameOver button:hover {
+            background-color: #00cc00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.8);
+        }
+
+        #levelSelectOverlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 250;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        #levelSelectOverlay h1 {
+            color: #00ff00;
+            font-size: 42px;
+            text-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        .levelButton {
+            cursor: pointer;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            background: transparent;
+            padding: 16px 30px;
+            font-size: 22px;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            min-width: 220px;
+        }
+
+        .levelButton:hover {
+            background: rgba(0, 255, 0, 0.12);
+            transform: translateY(-2px);
+        }
+
+        #levelInfo {
+            color: #ffffff;
+            font-size: 18px;
+            max-width: 520px;
+            line-height: 1.5;
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+        }
+
+        #timer {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #ff0000;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+        }
+
+        #accuracy {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #00ff00;
+            font-size: 18px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div>Score: <span id="score">0</span></div>
+        <div>Hits: <span id="hits">0</span></div>
+        <div>Misses: <span id="misses">0</span></div>
+    </div>
+    <div id="timer">Time: <span id="timeLeft">30</span>s</div>
+    <div id="accuracy">Accuracy: <span id="accuracyValue">0</span>%</div>
+    <div id="crosshair"></div>
+    <div id="levelSelectOverlay">
+        <h1>Select Difficulty</h1>
+        <div id="levelInfo">Choose your difficulty before starting. Easy has large targets and slower spawn speed, Hard is in the middle, and Impossible is the fast, small-target experience. Controls: W/S are inverted, Space moves up, Shift moves down, and holding E spam shoots.</div>
+        <button class="levelButton" data-level="easy">Easy</button>
+        <button class="levelButton" data-level="hard">Hard</button>
+        <button class="levelButton" data-level="impossible">Impossible</button>
+    </div>
+    <div id="gameOver">
+        <h1>Game Over!</h1>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <p>Accuracy: <span id="finalAccuracy">0</span>%</p>
+        <button onclick="location.reload()">Play Again</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Game variables
+        let score = 0;
+        let hits = 0;
+        let misses = 0;
+        let gameTime = 30;
+        let gameActive = false;
+        let targets = [];
+        let targetSpawnRate = 1000; // milliseconds
+        let currentLevel = 'impossible';
+        let targetRadius = 3;
+        let targetLife = 3000;
+        let orbRadius = 80;
+        let gunRecoil = 0;
+        let isShooting = false;
+        let canShoot = true;
+        let pointerLocked = false;
+        let yaw = 0;
+        let pitch = 0;
+        const movement = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            up: false,
+            down: false,
+        };
+
+        const levels = {
+            easy: { targetRadius: 6, targetSpawnRate: 1400, targetLife: 4500 },
+            hard: { targetRadius: 4.2, targetSpawnRate: 1100, targetLife: 3500 },
+            impossible: { targetRadius: 3, targetSpawnRate: 900, targetLife: 3000 },
+        }; 
+
+        function applyLevel(level) {
+            currentLevel = level;
+            targetRadius = levels[level].targetRadius;
+            targetSpawnRate = levels[level].targetSpawnRate;
+            targetLife = levels[level].targetLife;
+        }
+
+        function startGame(level) {
+            applyLevel(level);
+            document.getElementById('levelSelectOverlay').style.display = 'none';
+            score = 0;
+            hits = 0;
+            misses = 0;
+            gameTime = 30;
+            gameActive = true;
+            yaw = 0;
+            pitch = 0;
+            camera.position.set(0, 0, 0);
+            camera.rotation.set(0, 0, 0);
+            updateHUD();
+            document.getElementById('timeLeft').textContent = gameTime;
+            if (spawnInterval) {
+                clearInterval(spawnInterval);
+            }
+            spawnInterval = setInterval(spawnTarget, targetSpawnRate);
+            if (renderer.domElement.requestPointerLock) {
+                renderer.domElement.requestPointerLock();
+            }
+        }
+
+        // Three.js setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+        scene.fog = new THREE.Fog(0x1a1a2e, 500, 1000);
+
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        camera.rotation.order = 'YXZ';
+        camera.position.set(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(50, 50, 50);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 500;
+        directionalLight.shadow.camera.left = -200;
+        directionalLight.shadow.camera.right = 200;
+        directionalLight.shadow.camera.top = 200;
+        directionalLight.shadow.camera.bottom = -200;
+        scene.add(directionalLight);
+
+        const pointLight = new THREE.PointLight(0x00ff00, 1, 500);
+        pointLight.position.set(0, 0, 100);
+        scene.add(pointLight);
+
+        // Create interior orb environment
+        const orbGeometry = new THREE.SphereGeometry(orbRadius, 64, 64);
+        const orbMaterial = new THREE.MeshStandardMaterial({
+            color: 0x08182f,
+            side: THREE.BackSide,
+            emissive: 0x001133,
+            roughness: 1,
+            metalness: 0,
+        });
+        const orb = new THREE.Mesh(orbGeometry, orbMaterial);
+        scene.add(orb);
+
+        const orbWire = new THREE.LineSegments(
+            new THREE.WireframeGeometry(new THREE.SphereGeometry(orbRadius - 2, 32, 32)),
+            new THREE.LineBasicMaterial({ color: 0x114488, transparent: true, opacity: 0.2 })
+        );
+        scene.add(orbWire);
+
+        // Raycaster for hit detection
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // Create gun model
+        const gunGroup = new THREE.Group();
+        camera.add(gunGroup);
+
+        function createGun() {
+            // Position gun to the right and lower in view
+            gunGroup.position.set(3, -2, -8);
+
+            const gunBarrel = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.4, 0.4, 12, 16),
+                new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.9, roughness: 0.1 })
+            );
+            gunBarrel.position.set(0, 0, -6);
+            gunBarrel.castShadow = true;
+            gunGroup.add(gunBarrel);
+
+            const gunStock = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 1.2, 8),
+                new THREE.MeshStandardMaterial({ color: 0x654321, metalness: 0.2, roughness: 0.9 })
+            );
+            gunStock.position.set(0, 0, 2);
+            gunStock.castShadow = true;
+            gunGroup.add(gunStock);
+
+            const gunHandle = new THREE.Mesh(
+                new THREE.BoxGeometry(0.8, 2, 1.5),
+                new THREE.MeshStandardMaterial({ color: 0x654321, metalness: 0.2, roughness: 0.9 })
+            );
+            gunHandle.position.set(0.6, -1.2, 1.5);
+            gunGroup.add(gunHandle);
+
+            const gunTrigger = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 1, 0.3),
+                new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.7, roughness: 0.5 })
+            );
+            gunTrigger.position.set(0.7, -0.3, 1);
+            gunGroup.add(gunTrigger);
+
+            const gunMuzzle = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.5, 0.45, 2, 16),
+                new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.95, roughness: 0.05 })
+            );
+            gunMuzzle.position.set(0, 0, -12);
+            gunGroup.add(gunMuzzle);
+
+            // Scope/sight
+            const gunScope = new THREE.Mesh(
+                new THREE.BoxGeometry(0.6, 0.6, 3),
+                new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.8, roughness: 0.2 })
+            );
+            gunScope.position.set(0, 1.2, -2);
+            gunGroup.add(gunScope);
+
+            const scopeGlass = new THREE.Mesh(
+                new THREE.SphereGeometry(0.3, 16, 16),
+                new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00aa00, emissiveIntensity: 0.8, transparent: true, opacity: 0.6 })
+            );
+            scopeGlass.position.set(0, 1.2, -0.5);
+            gunGroup.add(scopeGlass);
+
+            // Muzzle
+            window.gunMuzzle = gunMuzzle;
+        }
+
+        createGun();
+
+        function setupControls() {
+            document.addEventListener('pointerlockchange', () => {
+                pointerLocked = document.pointerLockElement === renderer.domElement;
+            });
+
+            document.addEventListener('mousemove', (event) => {
+                if (!pointerLocked || !gameActive) return;
+                yaw -= event.movementX * 0.002;
+                pitch -= event.movementY * 0.002;
+                pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch));
+                camera.rotation.set(pitch, yaw, 0, 'YXZ');
+            });
+
+            window.addEventListener('keydown', (event) => {
+                if (['KeyW','KeyS','KeyA','KeyD','ShiftLeft','ShiftRight','KeyE','Space'].includes(event.code)) {
+                    event.preventDefault();
+                }
+                switch (event.code) {
+                    case 'KeyW': movement.forward = true; break;
+                    case 'KeyS': movement.backward = true; break;
+                    case 'KeyA': movement.left = true; break;
+                    case 'KeyD': movement.right = true; break;
+                    case 'ShiftLeft':
+                    case 'ShiftRight': movement.down = true; break;
+                    case 'Space': movement.up = true; break;
+                    case 'KeyE': spamShooting = true; break;
+                }
+            });
+
+            window.addEventListener('keyup', (event) => {
+                switch (event.code) {
+                    case 'KeyW': movement.forward = false; break;
+                    case 'KeyS': movement.backward = false; break;
+                    case 'KeyA': movement.left = false; break;
+                    case 'KeyD': movement.right = false; break;
+                    case 'ShiftLeft':
+                    case 'ShiftRight': movement.down = false; break;
+                    case 'Space': movement.up = false; break;
+                    case 'KeyE': spamShooting = false; break;
+                }
+            });
+        }
+
+        setupControls();
+
+        // Target class
+        class Target {
+            constructor() {
+                const colors = [0xff0000, 0x00ff00, 0xffff00, 0xff00ff, 0x00ffff];
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+                this.geometry = new THREE.SphereGeometry(targetRadius, 32, 32);
+                this.material = new THREE.MeshStandardMaterial({
+                    color: randomColor,
+                    metalness: 0.3,
+                    roughness: 0.4,
+                    emissive: randomColor,
+                    emissiveIntensity: 0.5,
+                });
+                this.mesh = new THREE.Mesh(this.geometry, this.material);
+
+                // Random position
+                const radius = orbRadius - 10 - Math.random() * 8;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const theta = Math.random() * Math.PI * 2;
+                this.mesh.position.set(
+                    radius * Math.sin(phi) * Math.cos(theta),
+                    radius * Math.cos(phi),
+                    radius * Math.sin(phi) * Math.sin(theta)
+                );
+
+                this.mesh.castShadow = true;
+                this.mesh.receiveShadow = true;
+
+                scene.add(this.mesh);
+
+                // Lifetime
+                this.lifetime = 0;
+                this.maxLifetime = targetLife;
+
+                // Add glow effect
+                this.addGlow();
+            }
+
+            addGlow() {
+                const glowGeometry = new THREE.SphereGeometry(3.5, 32, 32);
+                const glowMaterial = new THREE.MeshBasicMaterial({
+                    color: this.material.color,
+                    transparent: true,
+                    opacity: 0.2,
+                });
+                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                this.mesh.add(glow);
+            }
+
+            update(deltaTime) {
+                this.lifetime += deltaTime;
+                this.mesh.rotation.x += 0.01;
+                this.mesh.rotation.y += 0.02;
+
+                // Pulse effect
+                const scale = 1 + Math.sin(this.lifetime / 100) * 0.1;
+                this.mesh.scale.set(scale, scale, scale);
+
+                // Move slightly
+                this.mesh.position.y += Math.sin(this.lifetime / 500) * 0.1;
+            }
+
+            isExpired() {
+                return this.lifetime > this.maxLifetime;
+            }
+
+            dispose() {
+                scene.remove(this.mesh);
+                this.geometry.dispose();
+                this.material.dispose();
+            }
+        }
+
+        // Spawn targets
+        function spawnTarget() {
+            if (gameActive) {
+                targets.push(new Target());
+            }
+        }
+
+        let spawnInterval = null;
+
+        document.querySelectorAll('.levelButton').forEach((button) => {
+            button.addEventListener('click', () => startGame(button.dataset.level));
+        });
+
+        function shoot(event) {
+            if (!gameActive || !canShoot) return;
+            isShooting = true;
+            canShoot = false;
+            gunRecoil = 0.3;
+
+            const muzzleFlash = new THREE.Mesh(
+                new THREE.SphereGeometry(0.3, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xffaa00, emissive: 0xff5500 })
+            );
+            muzzleFlash.position.copy(gunGroup.position);
+            muzzleFlash.position.x += 0.5;
+            muzzleFlash.position.z -= 2;
+            camera.add(muzzleFlash);
+
+            setTimeout(() => {
+                camera.remove(muzzleFlash);
+            }, 50);
+
+            playGunSound();
+
+            if (event) {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            } else {
+                mouse.x = 0;
+                mouse.y = 0;
+            }
+
+            raycaster.setFromCamera(mouse, camera);
+            const targetMeshes = targets.map((t) => t.mesh);
+            const intersects = raycaster.intersectObjects(targetMeshes);
+
+            const start = new THREE.Vector3(0.5, -0.2, -1);
+            camera.localToWorld(start);
+            const direction = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation).normalize();
+            const shotDistance = 150;
+            const end = intersects.length > 0 ? intersects[0].point.clone() : start.clone().add(direction.clone().multiplyScalar(shotDistance));
+            const beamGeometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+            const beamMaterial = new THREE.LineBasicMaterial({ color: 0xffcc33, transparent: true, opacity: 0.85 });
+            const beam = new THREE.Line(beamGeometry, beamMaterial);
+            scene.add(beam);
+            setTimeout(() => {
+                scene.remove(beam);
+                beamGeometry.dispose();
+                beamMaterial.dispose();
+            }, 80);
+
+            if (intersects.length > 0) {
+                const hitTarget = targets.find((t) => t.mesh === intersects[0].object);
+                if (hitTarget) {
+                    score += 10;
+                    hits++;
+                    createExplosion(hitTarget.mesh.position);
+                    hitTarget.dispose();
+                    targets = targets.filter((t) => t !== hitTarget);
+                }
+            } else {
+                misses++;
+            }
+
+            updateHUD();
+
+            setTimeout(() => {
+                canShoot = true;
+                isShooting = false;
+            }, 100);
+        }
+
+        document.addEventListener('click', (event) => {
+            shoot(event);
+        });
+
+        // Update HUD
+        function updateHUD() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('hits').textContent = hits;
+            document.getElementById('misses').textContent = misses;
+
+            const accuracy = hits + misses > 0 ? Math.round((hits / (hits + misses)) * 100) : 0;
+            document.getElementById('accuracyValue').textContent = accuracy;
+        }
+
+        // Gun sound effect
+        function playGunSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+
+        // Explosion effect
+        function createExplosion(position) {
+            for (let i = 0; i < 8; i++) {
+                const particle = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.2, 8, 8),
+                    new THREE.MeshBasicMaterial({ color: 0xffff00 })
+                );
+                particle.position.copy(position);
+
+                const velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 50,
+                    (Math.random() - 0.5) * 50,
+                    (Math.random() - 0.5) * 50
+                );
+
+                scene.add(particle);
+
+                let elapsed = 0;
+                const duration = 0.5;
+                const animateParticle = () => {
+                    elapsed += 0.016;
+                    if (elapsed > duration) {
+                        scene.remove(particle);
+                        return;
+                    }
+
+                    particle.position.add(velocity.clone().multiplyScalar(0.016));
+                    particle.material.opacity = 1 - elapsed / duration;
+                    requestAnimationFrame(animateParticle);
+                };
+
+                particle.material.transparent = true;
+                animateParticle();
+            }
+        }
+
+        // Game timer
+        let timeInterval = setInterval(() => {
+            if (gameActive) {
+                gameTime--;
+                document.getElementById('timeLeft').textContent = gameTime;
+
+                if (gameTime <= 0) {
+                    endGame();
+                }
+            }
+        }, 1000);
+
+        // End game
+        function endGame() {
+            gameActive = false;
+            clearInterval(spawnInterval);
+            clearInterval(timeInterval);
+
+            targets.forEach((target) => target.dispose());
+            targets = [];
+
+            const accuracy = hits + misses > 0 ? Math.round((hits / (hits + misses)) * 100) : 0;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalAccuracy').textContent = accuracy;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        // Increase difficulty
+        let difficultyInterval = setInterval(() => {
+            if (gameActive && targetSpawnRate > 500) {
+                targetSpawnRate -= 50;
+                clearInterval(spawnInterval);
+                spawnInterval = setInterval(spawnTarget, targetSpawnRate);
+            }
+        }, 5000);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+
+        // Animation loop
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const deltaTime = clock.getDelta() * 1000; // Convert to milliseconds
+
+            // Gun recoil animation
+            if (gunRecoil > 0) {
+                gunRecoil -= 0.05;
+                gunGroup.position.z = -Math.abs(Math.sin(gunRecoil * 20)) * 0.3;
+            } else {
+                gunGroup.position.z = 0;
+            }
+
+            if (gameActive) {
+                const moveSpeed = 0.3;
+                const velocity = new THREE.Vector3();
+                if (movement.forward) velocity.z += 1;
+                if (movement.backward) velocity.z -= 1;
+                if (movement.left) velocity.x -= 1;
+                if (movement.right) velocity.x += 1;
+                if (movement.up) velocity.y += 1;
+                if (movement.down) velocity.y -= 1;
+                if (velocity.lengthSq() > 0) {
+                    velocity.normalize().multiplyScalar(moveSpeed);
+                    const forward = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation);
+                    const right = new THREE.Vector3(1, 0, 0).applyEuler(camera.rotation);
+                    camera.position.add(forward.multiplyScalar(velocity.z));
+                    camera.position.add(right.multiplyScalar(velocity.x));
+                    camera.position.y += velocity.y;
+                    if (camera.position.length() > orbRadius - 8) {
+                        camera.position.setLength(orbRadius - 8);
+                    }
+                }
+                if (spamShooting) {
+                    shoot();
+                }
+            }
+
+            // Update targets
+            targets.forEach((target, index) => {
+                target.update(deltaTime);
+
+                if (target.isExpired()) {
+                    target.dispose();
+                    targets.splice(index, 1);
+                    if (gameActive) {
+                        misses++;
+                        updateHUD();
+                    }
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+        updateHUD();
+    </script>
+</body>
+</html>
